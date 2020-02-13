@@ -262,7 +262,7 @@ enum {
   STA_NEGY,
   NaN_4,
   /* F0-FF */
-  NaN_5,
+  LDA_IM,
   LDA_AB,
   LDA_NS,
   LDA_NX,
