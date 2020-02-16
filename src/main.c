@@ -56,6 +56,14 @@ enum {
 /* Registers */
 uint8_t reg[R_I];
 
+void reg_print() {
+  printf("----------------------------------------\n");
+  printf("A=%02X, T=%02X, R=%02X, X=%02X, Y=%02X,\n" 
+          "SP=%02X, PC=%02X, TA=%02X, CC=%02X, I=%02X\n", 
+          reg[R_A], reg[R_T], reg[R_R], reg[R_X], reg[R_Y],
+          reg[R_SP], reg[R_PC], reg[R_TA], reg[R_CC], reg[R_I]);
+}
+
 /* 256 bytes memory */
 uint8_t memory [MEM_SIZE];
 
@@ -81,9 +89,11 @@ void mem_print() {
 
 void update_flags(uint8_t r) {
  if(r == 0)
-    reg[R_CC] |= FL_Z;
- if(r >> 7)
-   reg[R_CC] |= FL_N;
+    reg[R_CC] = FL_Z;
+ else if(r >> 7)
+   reg[R_CC] = FL_N;
+ else
+   reg[R_CC] = 0;
 }
 
 //TODO these two flag setters below
@@ -114,14 +124,15 @@ int main(int argc, const char *argv[]) {
 
   /* Initial fetch: Set PC from RST_VECTOR*/
   //reg[R_PC] = mem_read(RST_VECTOR);
-  reg[R_PC] = 0x20;
-  reg[R_SP] = 0x20;
+  //TODO this will be replaced with LDSP #20, and ORG $FF FCB $20 later on
+  reg[R_SP] = reg[R_PC] = 0x20;
+
   int alive = 1;
   while(alive) {
-    printf("PC=%02X, SP=%02X\n", reg[R_PC], reg[R_SP]);
-
+    reg_print();
     /* Fetch */
     uint8_t op_code = mem_read(reg[R_PC]++);
+    reg[R_I] = op_code;
      
     switch(op_code) {
       case NOP:
@@ -152,8 +163,12 @@ int main(int argc, const char *argv[]) {
         break;
       case DECA:
         reg[R_A]--;
+        update_flags(reg[R_A]);
         break;
-      
+      case INCA:
+        reg[R_A]++;
+        update_flags(reg[R_A]);
+        break; 
       /* Stack operations */
       case PSHA:
         reg[R_SP] -= 1;
@@ -161,6 +176,62 @@ int main(int argc, const char *argv[]) {
         break;
 
       /* Program flow */
+      case BSR:
+        reg[R_SP] -= 1;
+        mem_write(reg[R_SP], reg[R_PC]);
+        reg[R_PC] += op_arg();
+        break;
+      case BRA:
+        reg[R_PC] += op_arg();
+        break;
+      case BNE:
+        if(!(reg[R_CC] & FL_Z))
+           reg[R_PC] += op_arg();
+        else
+          reg[R_PC] += 1;
+        break;
+      case BCC:
+        if(!(reg[R_CC] & FL_C))
+           reg[R_PC] += op_arg();
+        else
+          reg[R_PC] += 1;
+        break;
+      case BCS:
+        if(reg[R_CC] & FL_Z)
+           reg[R_PC] += op_arg();
+        else
+          reg[R_PC] += 1;
+        break;
+      case BEQ:
+        if(reg[R_CC] & FL_Z)
+           reg[R_PC] += op_arg();
+        else
+          reg[R_PC] += 1;
+        break;
+      case BGE:
+        if(((reg[R_CC] & FL_N) ^ (reg[R_CC] & FL_V)) == 0)
+           reg[R_PC] += op_arg();
+        else
+          reg[R_PC] += 1;
+        break;
+      case BGT:
+        if(((reg[R_CC] & FL_N) ^ (reg[R_CC] & FL_V) || reg[R_CC] & FL_Z) == 0)
+           reg[R_PC] += op_arg();
+        else
+          reg[R_PC] += 1;
+        break;
+      case BHI:
+        if((reg[R_CC] & FL_Z) || (reg[R_CC] & FL_C))
+           reg[R_PC] += op_arg();
+        else
+          reg[R_PC] += 1;
+        break;
+      case BLE:
+        if(((reg[R_CC] & FL_N) ^ (reg[R_CC] & FL_V) || reg[R_CC] & FL_Z))
+           reg[R_PC] += op_arg();
+        else
+          reg[R_PC] += 1;
+        break;
       case JSR_AB:
         reg[R_SP] -= 1;
         mem_write(reg[R_SP], reg[R_PC]);
@@ -178,6 +249,7 @@ int main(int argc, const char *argv[]) {
         break;
     }
   }
+  reg_print();
 }
 
 /* ===== File input functions below ===== */
