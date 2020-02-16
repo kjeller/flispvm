@@ -20,11 +20,11 @@ enum {
   R_R,
   R_X,
   R_Y,
-  R_SP,
-  R_PC,   //Program counter
-  R_TA,
-  R_CC,
-  R_I     //Instruction
+  R_SP,   // Stack pointer
+  R_PC,   // Program counter
+  R_TA,   
+  R_CC,   // Flag register
+  R_I     // Instruction
 };
 
 /* Flags in CC register */
@@ -50,14 +50,15 @@ uint8_t mem_read(uint8_t address) {
   return memory[address];
 }
 
-/* Prints all memory [adr]:[data]
- * e.g. 00:00 01:00 ..*/
+/* Prints all memory [adr]:[data] */
 void mem_print() {
-  printf("[addr]:[data]\n");
-  for(int i = 0; i < MEM_SIZE; i ++) {
-    printf("%02X:%02X\t", i, mem_read(i));
-    if(i % 15 == 0)
-      printf("\n");
+  for(unsigned char lsb = 0; lsb <= 0xF; lsb++) {
+    for(unsigned char msb = 0; msb <= 0xF; msb++) {
+      unsigned int addr = msb << 4 | lsb;  
+      printf("%02X:%02X ", addr, mem_read(addr));
+      
+    }
+    printf("\n");
   }
 }
 
@@ -78,9 +79,12 @@ void signed_fcheck(int8_t a, int8_t b) {}
  */
 int read_s19_file(FILE *file) {
   char tmp[2]; //place to store S1 and finally overwrite S9
-  unsigned int byte_c; 
-  unsigned int addr;
-  unsigned int cnt = 0;
+  
+  /* Derived directly from file:
+   * S1[byte_c][addr][data][chsum] */
+  unsigned int byte_c, addr,  chsum;
+  unsigned char cnt; /* to check if byte_c is correct after read */
+  unsigned long byte_sum;
   
   /* All instructions (op + operand) will be stored 
    * here temporarily then moved into actual memory*/
@@ -88,22 +92,50 @@ int read_s19_file(FILE *file) {
 
   fscanf(file, "%2s", tmp);       /* Read S1 */
   fscanf(file, "%2x", &byte_c);   /* Read byte count 1 bytes */
-  fscanf(file, "%4x", &addr);  /* Read address 2 bytes */
-  cnt += 2;  // adjust counter 2 byte for address
+  fscanf(file, "%4x", &addr);     /* Read address 2 bytes */
+  cnt = 2;                        /* adjust counter 2 byte for address */
   mem_temp = malloc(sizeof(unsigned int) * byte_c);
 
   unsigned int i = 0;
-  while(cnt < byte_c) {
-    int rv = fscanf(file, "%2x", &mem_temp[i++]);
+  while(cnt < byte_c-1) {
+    int rv = fscanf(file, "%2x", &mem_temp[i]);
     if(rv != 1)
       break;
+
+    // add byte to validate
+    byte_sum += mem_temp[i++];
     cnt++;
   }
+ 
+  /* Last byte is checksum */
+  fscanf(file, "%2x", &chsum);
+  cnt++; //include checksum in bytecount
+
+  /* Validate checksum 
+   * 1. Add each byte after S1 to total
+   * 2. Mask: Keep the lowest byte of total
+   * 3. Compute complement of least significant byte
+   */
+
+  /* Add individual byte from 2 byte address*/
+  byte_sum += (addr >> 8) + (addr & 0xFF);
+  byte_sum += byte_c;
+  /* Mask */ 
+  unsigned char _chsum = (byte_sum & 0xFF);
+  /* Complement */
+  _chsum = ~_chsum;
+
+  /* Error handling */
+  if(_chsum != chsum) {
+    printf("Error: Checksum invalid (%2X != %2X)\n", _chsum, chsum);
+    return 1;
+  } 
 
   if(cnt != byte_c) {
     printf("Error: byte count not correct value: %u\n", cnt);
     return 1;
   }
+
   /* Copy mem_temp to memory
    * starting from addr offset 
    */
@@ -121,7 +153,7 @@ int read_file(const char *image_path) {
   if(!file) return 0;
   read_s19_file(file);
   fclose(file);
-  printf("File: %s successfully read into memory\n", image_path);
+  printf("%s successfully read into memory\n", image_path);
   return 0;
 }
 
