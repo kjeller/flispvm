@@ -1,4 +1,4 @@
-# flispvm
+# FlispVM - Flexible Instruction Set Processor Virtual Machine
 A VM emulating the FLISP (FLexible Instruction Set) processor, which is an 8-bit processor used in
 introductionary courses to computer engineering on Chalmers University of Technology.
 
