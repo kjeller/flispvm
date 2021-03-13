@@ -5,6 +5,10 @@
  * All opcodes derived from opcode map for the FLISP.
  * There are 250 op codes available.
  */
+
+#ifndef H_OP_CODES
+#define H_OP_CODES
+
 enum {
   /* 00-0F */
   NOP = 0,
@@ -279,3 +283,5 @@ enum {
   LDA_NEGY,
   NaN_6
 };
+
+#endif
