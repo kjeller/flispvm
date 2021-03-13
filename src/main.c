@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "include/opcodes.h"
+#include "opcodes.h"
 
 #define RST_VECTOR 0xFF
 #define MEM_SIZE 256
